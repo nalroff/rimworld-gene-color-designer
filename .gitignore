@@ -1,0 +1,18 @@
+# Build intermediates
+Source/**/obj/
+Source/**/bin/
+
+# IDE files
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local SDK home used for sandboxed dotnet builds
+.dotnet/
+
+# OS noise
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <GeneDef>
+    <defName>Skin_SunsetSpectrum</defName>
+    <label>sunset spectrum skin</label>
+    <labelShortAdj>sunset</labelShortAdj>
+    <description>Carriers of this germline gene express a wide, warm skin-color spectrum. Each pawn resolves a stable personal shade, and children born with the gene inherit a color sampled between their parents.</description>
+    <geneClass>GeneColorInheritance.Genes.Gene_SkinColorRange, GeneColorInheritance</geneClass>
+    <biostatCpx>1</biostatCpx>
+    <biostatMet>0</biostatMet>
+    <iconPath>UI/Icons/Genes/Gene_SkinColorOverride</iconPath>
+    <displayCategory>Cosmetic_Skin</displayCategory>
+    <displayOrderInCategory>18</displayOrderInCategory>
+    <selectionWeight>0.15</selectionWeight>
+    <skinColorOverride>(255, 220, 150)</skinColorOverride>
+    <randomBrightnessFactor>0</randomBrightnessFactor>
+    <exclusionTags>
+      <li>SkinColorOverride</li>
+    </exclusionTags>
+    <customEffectDescriptions>
+      <li>Each carrier resolves a stable skin color from a configured palette or HSV range.</li>
+      <li>Babies born with the gene inherit a skin color sampled between their parents.</li>
+    </customEffectDescriptions>
+    <modExtensions>
+      <li Class="GeneColorInheritance.Genes.GeneColorRangeExtension, GeneColorInheritance">
+        <paletteColors>
+          <li>(255, 231, 199)</li>
+          <li>(237, 180, 122)</li>
+          <li>(199, 111, 88)</li>
+          <li>(120, 63, 54)</li>
+        </paletteColors>
+        <hueRange>0.03~0.09</hueRange>
+        <saturationRange>0.35~0.7</saturationRange>
+        <valueRange>0.45~1.0</valueRange>
+      </li>
+    </modExtensions>
+  </GeneDef>
+</Defs>
