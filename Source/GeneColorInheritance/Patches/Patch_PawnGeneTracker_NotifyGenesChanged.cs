@@ -14,7 +14,7 @@ namespace GeneColorInheritance.Patches
             );
             if (gene != null)
             {
-                gene.ApplyResolvedColor();
+                GeneColorInheritanceUtility.ResolveAndApply(gene);
             }
         }
     }

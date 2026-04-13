@@ -1,3 +1,4 @@
+using GeneColorInheritance.Data;
 using UnityEngine;
 using Verse;
 
@@ -7,7 +8,11 @@ namespace GeneColorInheritance.Genes
     {
         private Color? resolvedColor;
 
+        private DesignedGeneColorProfile? designedProfile;
+
         public Color? ResolvedColor => resolvedColor;
+
+        public DesignedGeneColorProfile? DesignedProfile => designedProfile;
 
         public override void PostAdd()
         {
@@ -32,6 +37,7 @@ namespace GeneColorInheritance.Genes
         {
             base.ExposeData();
             Scribe_Values.Look(ref resolvedColor, "resolvedColor", null, false);
+            Scribe_Deep.Look(ref designedProfile, "designedProfile");
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
@@ -46,6 +52,12 @@ namespace GeneColorInheritance.Genes
         {
             resolvedColor = color;
             ApplyResolvedColor();
+        }
+
+        public void SetDesignedProfile(DesignedGeneColorProfile profile)
+        {
+            designedProfile = profile.Clone();
+            resolvedColor = null;
         }
 
         public void ApplyResolvedColor()

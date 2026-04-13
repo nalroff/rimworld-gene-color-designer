@@ -1,3 +1,4 @@
+using GeneColorInheritance.Data;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -50,8 +51,21 @@ namespace GeneColorInheritance.Genes
                 return;
             }
 
+            if (gene.DesignedProfile == null)
+            {
+                DesignedGeneProfileStore.TryApplyFallbackProfileFromPawn(gene);
+            }
+
+            DesignedGeneColorProfile? designedProfile = gene.DesignedProfile;
+
             if (forceResample || gene.ResolvedColor == null)
             {
+                if (designedProfile != null)
+                {
+                    gene.SetResolvedColor(SampleColor(designedProfile));
+                    return;
+                }
+
                 GeneColorRangeExtension? extension = GetExtension(gene.def);
                 if (extension == null)
                 {
@@ -127,6 +141,17 @@ namespace GeneColorInheritance.Genes
             return Color.white;
         }
 
+        public static Color SampleColor(DesignedGeneColorProfile profile)
+        {
+            if (profile.HasPaletteColors)
+            {
+                return SampleFromPalette(profile.PaletteColorValues());
+            }
+
+            Log.Warning("[Gene Color Designer] Designed profile has no valid palette. Falling back to white.");
+            return Color.white;
+        }
+
         public static Color InterpolateColorsHsv(Color first, Color second, float t)
         {
             Color.RGBToHSV(first, out float hueA, out float satA, out float valA);
@@ -197,6 +222,11 @@ namespace GeneColorInheritance.Genes
 
         private static Color SampleFromPalette(List<Color> paletteColors)
         {
+            if (paletteColors.Count == 0)
+            {
+                return Color.white;
+            }
+
             if (paletteColors.Count == 1)
             {
                 return paletteColors[0];
