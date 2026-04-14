@@ -224,7 +224,12 @@ namespace GeneColorInheritance.UI
             }
         }
 
-        private void UpdateComponentFromMouse(Rect sliderRect, int index, int maxValue, float mouseX)
+        private void UpdateComponentFromMouse(
+            Rect sliderRect,
+            int index,
+            int maxValue,
+            float mouseX
+        )
         {
             float normalized = Mathf.InverseLerp(sliderRect.x, sliderRect.xMax, mouseX);
             SetHsvComponent(index, Mathf.RoundToInt(Mathf.Clamp01(normalized) * maxValue));
@@ -245,13 +250,7 @@ namespace GeneColorInheritance.UI
             return ref valueDragging;
         }
 
-        private void DrawTrack(
-            Rect sliderRect,
-            float hue,
-            float saturation,
-            float value,
-            int index
-        )
+        private void DrawTrack(Rect sliderRect, float hue, float saturation, float value, int index)
         {
             int segments = Mathf.Max(2, Mathf.RoundToInt(sliderRect.width));
             float segmentWidth = sliderRect.width / segments;
