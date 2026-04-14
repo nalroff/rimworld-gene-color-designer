@@ -12,6 +12,7 @@ Source/**/bin/
 
 # Local SDK home used for sandboxed dotnet builds
 .dotnet/
+Assemblies/
 
 # OS noise
 Thumbs.db

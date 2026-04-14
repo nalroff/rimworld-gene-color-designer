@@ -17,8 +17,6 @@ namespace GeneColorInheritance.UI
 
         private const float SliderHeight = 24f;
 
-        private readonly string header;
-
         private readonly List<Color> pickableColors;
 
         private readonly Action<Color> onApply;
@@ -46,7 +44,6 @@ namespace GeneColorInheritance.UI
             Action<Color> onApply
         )
         {
-            this.header = header;
             this.pickableColors = pickableColors;
             this.onApply = onApply;
             originalColor = selectedColor;
@@ -145,17 +142,26 @@ namespace GeneColorInheritance.UI
 
         private void DrawHsvEditors(float width, ref float curY)
         {
+            Color.RGBToHSV(workingColor, out float hue, out float saturation, out float value);
+
             Widgets.Label(new Rect(0f, curY, width, Text.LineHeight), "HSV");
             curY += Text.LineHeight + 4f;
 
-            DrawHsvSlider(width, ref curY, "Hue", 0);
-            DrawHsvSlider(width, ref curY, "Saturation", 1);
-            DrawHsvSlider(width, ref curY, "Value", 2);
+            DrawHsvSlider(width, ref curY, "Hue", 0, hue, saturation, value);
+            DrawHsvSlider(width, ref curY, "Saturation", 1, hue, saturation, value);
+            DrawHsvSlider(width, ref curY, "Value", 2, hue, saturation, value);
         }
 
-        private void DrawHsvSlider(float width, ref float curY, string label, int index)
+        private void DrawHsvSlider(
+            float width,
+            ref float curY,
+            string label,
+            int index,
+            float hue,
+            float saturation,
+            float value
+        )
         {
-            Color.RGBToHSV(workingColor, out float hue, out float saturation, out float value);
             int currentValue = GetCurrentComponentValue(index, hue, saturation, value);
             int maxValue = GetComponentMaxValue(index);
             float normalizedValue = Mathf.Clamp01(currentValue / (float)maxValue);

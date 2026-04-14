@@ -33,7 +33,7 @@ namespace GeneColorInheritance.UI
             Rect resetRect = new Rect(0f, curY, 180f, 30f);
             if (Widgets.ButtonText(resetRect, "Reset To Template"))
             {
-                CopyProfile(templateDefaults, profile);
+                profile.ResetFrom(templateDefaults);
                 state.selectedIndex = Mathf.Clamp(state.selectedIndex, 0, profile.paletteColors.Count - 1);
             }
 
@@ -139,7 +139,12 @@ namespace GeneColorInheritance.UI
             int index = Mathf.Clamp(state.selectedIndex, 0, profile.paletteColors.Count - 1);
             Color selectedColor = profile.paletteColors[index].color;
 
-            List<Color> choices = profile.PaletteColorValues();
+            List<Color> choices = new List<Color>(profile.paletteColors.Count);
+            for (int i = 0; i < profile.paletteColors.Count; i++)
+            {
+                choices.Add(profile.paletteColors[i].color);
+            }
+
             if (choices.Count == 0)
             {
                 choices.Add(selectedColor);
@@ -158,24 +163,6 @@ namespace GeneColorInheritance.UI
         private static float ViewHeight()
         {
             return 320f;
-        }
-
-        private static void CopyProfile(
-            DesignedGeneColorProfile source,
-            DesignedGeneColorProfile destination
-        )
-        {
-            destination.templateGeneDefName = source.templateGeneDefName;
-            destination.designId = source.designId;
-            destination.hueRange = source.hueRange;
-            destination.saturationRange = source.saturationRange;
-            destination.valueRange = source.valueRange;
-            destination.paletteColors.Clear();
-
-            for (int i = 0; i < source.paletteColors.Count; i++)
-            {
-                destination.paletteColors.Add(new DesignedColorEntry(source.paletteColors[i].color));
-            }
         }
     }
 }

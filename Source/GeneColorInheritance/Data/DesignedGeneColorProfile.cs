@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using GeneColorInheritance.Genes;
 using UnityEngine;
 using Verse;
@@ -55,45 +54,63 @@ namespace GeneColorInheritance.Data
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
-                paletteColors ??= new List<DesignedColorEntry>();
-                if (paletteColors.Count == 0 && HasCompleteHsvRange)
-                {
-                    AddPaletteFromRanges(this);
-                }
-
-                while (paletteColors.Count < 2)
-                {
-                    paletteColors.Add(new DesignedColorEntry(Color.white));
-                }
-
-                if (paletteColors.Count > 4)
-                {
-                    paletteColors.RemoveRange(4, paletteColors.Count - 4);
-                }
-
-                if (string.IsNullOrEmpty(designId))
-                {
-                    designId = Guid.NewGuid().ToString("N");
-                }
+                Normalize();
             }
         }
 
         public DesignedGeneColorProfile Clone()
         {
-            return new DesignedGeneColorProfile
-            {
-                templateGeneDefName = templateGeneDefName,
-                designId = designId,
-                hueRange = hueRange,
-                saturationRange = saturationRange,
-                valueRange = valueRange,
-                paletteColors = paletteColors.Select(entry => new DesignedColorEntry(entry.color)).ToList(),
-            };
+            DesignedGeneColorProfile clone = new DesignedGeneColorProfile();
+            clone.ResetFrom(this);
+            return clone;
         }
 
-        public List<Color> PaletteColorValues()
+        public void ResetFrom(DesignedGeneColorProfile source)
         {
-            return paletteColors.Select(entry => entry.color).ToList();
+            templateGeneDefName = source.templateGeneDefName;
+            designId = source.designId;
+            hueRange = source.hueRange;
+            saturationRange = source.saturationRange;
+            valueRange = source.valueRange;
+
+            paletteColors.Clear();
+            for (int i = 0; i < source.paletteColors.Count; i++)
+            {
+                paletteColors.Add(new DesignedColorEntry(source.paletteColors[i].color));
+            }
+
+            Normalize();
+        }
+
+        public void Normalize()
+        {
+            paletteColors ??= new List<DesignedColorEntry>();
+
+            if (paletteColors.Count == 0 && HasCompleteHsvRange)
+            {
+                PopulatePaletteFromLegacyRanges(this);
+            }
+
+            if (paletteColors.Count == 0)
+            {
+                paletteColors.Add(new DesignedColorEntry(new Color(1f, 0.9f, 0.8f)));
+                paletteColors.Add(new DesignedColorEntry(new Color(0.7f, 0.55f, 0.45f)));
+            }
+
+            while (paletteColors.Count < 2)
+            {
+                paletteColors.Add(new DesignedColorEntry(paletteColors[0].color));
+            }
+
+            if (paletteColors.Count > 4)
+            {
+                paletteColors.RemoveRange(4, paletteColors.Count - 4);
+            }
+
+            if (string.IsNullOrEmpty(designId))
+            {
+                designId = Guid.NewGuid().ToString("N");
+            }
         }
 
         public static DesignedGeneColorProfile FromExtension(GeneDef? geneDef)
@@ -114,33 +131,13 @@ namespace GeneColorInheritance.Data
                 {
                     profile.paletteColors.Add(new DesignedColorEntry(extension.paletteColors[i]));
                 }
-
-                if (!profile.HasPaletteColors && extension.HasCompleteHsvRange)
-                {
-                    AddPaletteFromRanges(profile);
-                }
             }
 
-            if (!profile.HasPaletteColors)
-            {
-                profile.paletteColors.Add(new DesignedColorEntry(new Color(1f, 0.9f, 0.8f)));
-                profile.paletteColors.Add(new DesignedColorEntry(new Color(0.7f, 0.55f, 0.45f)));
-            }
-
-            while (profile.paletteColors.Count < 2)
-            {
-                profile.paletteColors.Add(new DesignedColorEntry(profile.paletteColors[0].color));
-            }
-
-            if (profile.paletteColors.Count > 4)
-            {
-                profile.paletteColors.RemoveRange(4, profile.paletteColors.Count - 4);
-            }
-
+            profile.Normalize();
             return profile;
         }
 
-        private static void AddPaletteFromRanges(DesignedGeneColorProfile profile)
+        private static void PopulatePaletteFromLegacyRanges(DesignedGeneColorProfile profile)
         {
             profile.paletteColors.Clear();
             for (int i = 0; i < 4; i++)

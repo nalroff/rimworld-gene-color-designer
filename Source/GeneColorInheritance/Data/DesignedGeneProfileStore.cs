@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Linq;
+using System.Xml.Linq;
 using GeneColorInheritance.Genes;
 using HarmonyLib;
 using RimWorld;
@@ -95,21 +98,25 @@ namespace GeneColorInheritance.Data
             count = Mathf.Max(1, count);
             if (profile.HasPaletteColors)
             {
-                List<Color> palette = profile.PaletteColorValues();
-                if (palette.Count == 1)
+                if (profile.paletteColors.Count == 1)
                 {
-                    yield return palette[0];
+                    yield return profile.paletteColors[0].color;
                     yield break;
                 }
 
                 for (int i = 0; i < count; i++)
                 {
-                    float sample = count == 1 ? 0f : i * (palette.Count - 1f) / (count - 1f);
-                    int lowerIndex = Mathf.Clamp(Mathf.FloorToInt(sample), 0, palette.Count - 2);
+                    float sample =
+                        count == 1 ? 0f : i * (profile.paletteColors.Count - 1f) / (count - 1f);
+                    int lowerIndex = Mathf.Clamp(
+                        Mathf.FloorToInt(sample),
+                        0,
+                        profile.paletteColors.Count - 2
+                    );
                     float t = sample - lowerIndex;
                     yield return GeneColorInheritanceUtility.InterpolateColorsHsv(
-                        palette[lowerIndex],
-                        palette[lowerIndex + 1],
+                        profile.paletteColors[lowerIndex].color,
+                        profile.paletteColors[lowerIndex + 1].color,
                         t
                     );
                 }
@@ -144,7 +151,7 @@ namespace GeneColorInheritance.Data
             }
 
             dialogProfiles.Remove(dialog);
-            QueueDatabaseSave(key, database);
+            SaveDatabase(key, database);
         }
 
         public static bool TryApplyProfileFromCustomXenotype(
@@ -267,37 +274,21 @@ namespace GeneColorInheritance.Data
             DesignedGeneProfileDatabase? database = null;
             try
             {
-                Scribe.loader.InitLoading(path);
-                try
+                XDocument document = XDocument.Load(path);
+                XElement? root = document.Element(SidecarRootNode);
+                XElement? databaseNode = root?.Element("database");
+                if (databaseNode == null)
                 {
-                    if (!Scribe.EnterNode(SidecarRootNode))
-                    {
-                        return null;
-                    }
-
-                    try
-                    {
-                        Scribe_Deep.Look(ref database, "database");
-                    }
-                    finally
-                    {
-                        Scribe.ExitNode();
-                    }
-
-                    Scribe.loader.FinalizeLoading();
+                    return null;
                 }
-                catch
-                {
-                    Scribe.ForceStop();
-                    throw;
-                }
+
+                database = DeserializeDatabase(databaseNode);
             }
             catch (Exception ex)
             {
                 Log.Warning(
                     $"[Gene Color Designer] Failed to load profile sidecar for xenotype '{xenotypeKey}': {ex}"
                 );
-                Scribe.ForceStop();
                 return null;
             }
 
@@ -319,16 +310,17 @@ namespace GeneColorInheritance.Data
 
             try
             {
-                SafeSaver.Save(
-                    path,
-                    SidecarRootNode,
-                    delegate
-                    {
-                        DesignedGeneProfileDatabase db = database;
-                        Scribe_Deep.Look(ref db, "database");
-                    },
-                    leaveOldFile: false
+                string? directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                XDocument document = new XDocument(
+                    new XDeclaration("1.0", "utf-8", "yes"),
+                    new XElement(SidecarRootNode, SerializeDatabase(database))
                 );
+                File.WriteAllText(path, document.ToString());
             }
             catch (Exception ex)
             {
@@ -338,31 +330,183 @@ namespace GeneColorInheritance.Data
             }
         }
 
-        private static void QueueDatabaseSave(string xenotypeKey, DesignedGeneProfileDatabase database)
+        private static XElement SerializeDatabase(DesignedGeneProfileDatabase database)
         {
-            DesignedGeneProfileDatabase databaseToSave = database;
-            LongEventHandler.ExecuteWhenFinished(
-                delegate
-                {
-                    TrySaveWhenSafe(xenotypeKey, databaseToSave);
-                }
+            return new XElement(
+                "database",
+                new XElement("xenotypeKey", database.xenotypeKey),
+                new XElement(
+                    "records",
+                    database.records
+                        .Where(record =>
+                            record != null
+                            && !string.IsNullOrEmpty(record.templateGeneDefName)
+                            && record.profile != null
+                        )
+                        .Select(SerializeRecord)
+                )
             );
         }
 
-        private static void TrySaveWhenSafe(string xenotypeKey, DesignedGeneProfileDatabase database)
+        private static XElement SerializeRecord(DesignedGeneProfileRecord record)
         {
-            if (Scribe.mode != LoadSaveMode.Inactive)
+            return new XElement(
+                "li",
+                new XElement("templateGeneDefName", record.templateGeneDefName),
+                record.profile != null ? SerializeProfile(record.profile) : null
+            );
+        }
+
+        private static XElement SerializeProfile(DesignedGeneColorProfile profile)
+        {
+            return new XElement(
+                "profile",
+                new XElement("templateGeneDefName", profile.templateGeneDefName),
+                new XElement("designId", profile.designId),
+                new XElement(
+                    "paletteColors",
+                    profile.paletteColors.Select(entry =>
+                        new XElement("li", new XElement("color", SerializeColor(entry.color)))
+                    )
+                ),
+                new XElement("hueRange", SerializeRange(profile.hueRange)),
+                new XElement("saturationRange", SerializeRange(profile.saturationRange)),
+                new XElement("valueRange", SerializeRange(profile.valueRange))
+            );
+        }
+
+        private static DesignedGeneProfileDatabase DeserializeDatabase(XElement element)
+        {
+            DesignedGeneProfileDatabase database = new DesignedGeneProfileDatabase
             {
-                LongEventHandler.ExecuteWhenFinished(
-                    delegate
-                    {
-                        TrySaveWhenSafe(xenotypeKey, database);
-                    }
-                );
-                return;
+                xenotypeKey = (string?)element.Element("xenotypeKey") ?? string.Empty,
+            };
+
+            foreach (XElement recordElement in element.Element("records")?.Elements("li") ?? Enumerable.Empty<XElement>())
+            {
+                DesignedGeneProfileRecord? record = DeserializeRecord(recordElement);
+                if (record != null)
+                {
+                    database.records.Add(record);
+                }
             }
 
-            SaveDatabase(xenotypeKey, database);
+            return database;
+        }
+
+        private static DesignedGeneProfileRecord? DeserializeRecord(XElement element)
+        {
+            string? templateGeneDefName = (string?)element.Element("templateGeneDefName");
+            XElement? profileElement = element.Element("profile");
+            if (string.IsNullOrEmpty(templateGeneDefName) || profileElement == null)
+            {
+                return null;
+            }
+
+            DesignedGeneColorProfile profile = DeserializeProfile(profileElement);
+            return new DesignedGeneProfileRecord
+            {
+                templateGeneDefName = templateGeneDefName!,
+                profile = profile,
+            };
+        }
+
+        private static DesignedGeneColorProfile DeserializeProfile(XElement element)
+        {
+            DesignedGeneColorProfile profile = new DesignedGeneColorProfile
+            {
+                templateGeneDefName = (string?)element.Element("templateGeneDefName") ?? string.Empty,
+                designId = (string?)element.Element("designId") ?? Guid.NewGuid().ToString("N"),
+                hueRange = ParseRange((string?)element.Element("hueRange")),
+                saturationRange = ParseRange((string?)element.Element("saturationRange")),
+                valueRange = ParseRange((string?)element.Element("valueRange")),
+            };
+
+            foreach (XElement colorElement in element.Element("paletteColors")?.Elements("li") ?? Enumerable.Empty<XElement>())
+            {
+                string? rawColor = (string?)colorElement.Element("color");
+                if (TryParseColor(rawColor, out Color color))
+                {
+                    profile.paletteColors.Add(new DesignedColorEntry(color));
+                }
+            }
+
+            profile.Normalize();
+            return profile;
+        }
+
+        private static string SerializeRange(FloatRange range)
+        {
+            return range.TrueMin.ToString(CultureInfo.InvariantCulture)
+                + "~"
+                + range.TrueMax.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static FloatRange ParseRange(string? raw)
+        {
+            if (string.IsNullOrEmpty(raw))
+            {
+                return FloatRange.ZeroToOne;
+            }
+
+            string text = raw!;
+            string[] parts = text.Split('~');
+            if (
+                parts.Length == 2
+                && float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float min)
+                && float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float max)
+            )
+            {
+                return new FloatRange(min, max);
+            }
+
+            return FloatRange.ZeroToOne;
+        }
+
+        private static string SerializeColor(Color color)
+        {
+            return "#" + ColorUtility.ToHtmlStringRGBA(color);
+        }
+
+        private static bool TryParseColor(string? raw, out Color color)
+        {
+            color = Color.white;
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return false;
+            }
+
+            string text = raw!.Trim();
+            if (!text.StartsWith("#") && (text.Length == 6 || text.Length == 8))
+            {
+                text = "#" + text;
+            }
+
+            if (ColorUtility.TryParseHtmlString(text, out color))
+            {
+                return true;
+            }
+
+            if (!text.StartsWith("RGBA(", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string inner = text.Substring(5, text.Length - 6);
+            string[] parts = inner.Split(',');
+            if (
+                parts.Length == 4
+                && float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float r)
+                && float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float g)
+                && float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float b)
+                && float.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out float a)
+            )
+            {
+                color = new Color(r, g, b, a);
+                return true;
+            }
+
+            return false;
         }
 
         private static string SidecarPath(string xenotypeKey)

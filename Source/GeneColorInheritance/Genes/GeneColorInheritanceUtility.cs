@@ -145,7 +145,7 @@ namespace GeneColorInheritance.Genes
         {
             if (profile.HasPaletteColors)
             {
-                return SampleFromPalette(profile.PaletteColorValues());
+                return SampleFromPalette(profile.paletteColors);
             }
 
             Log.Warning("[Gene Color Designer] Designed profile has no valid palette. Falling back to white.");
@@ -238,6 +238,28 @@ namespace GeneColorInheritance.Genes
             return InterpolateColorsHsv(
                 paletteColors[lowerIndex],
                 paletteColors[lowerIndex + 1],
+                t
+            );
+        }
+
+        private static Color SampleFromPalette(List<DesignedColorEntry> paletteColors)
+        {
+            if (paletteColors.Count == 0)
+            {
+                return Color.white;
+            }
+
+            if (paletteColors.Count == 1)
+            {
+                return paletteColors[0].color;
+            }
+
+            float sample = Rand.Range(0f, paletteColors.Count - 1f);
+            int lowerIndex = Mathf.Clamp(Mathf.FloorToInt(sample), 0, paletteColors.Count - 2);
+            float t = sample - lowerIndex;
+            return InterpolateColorsHsv(
+                paletteColors[lowerIndex].color,
+                paletteColors[lowerIndex + 1].color,
                 t
             );
         }
